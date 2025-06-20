@@ -1,0 +1,73 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+[x-cloak] {
+    display: none;
+}
+
+/* Suppression forcée de l'apparence native des selects */
+select {
+    -webkit-appearance: none !important;
+    -moz-appearance: none !important;
+    appearance: none !important;
+    background-image: none !important;
+    background-repeat: no-repeat !important;
+    background-position: right center !important;
+    background-size: 0 !important;
+}
+
+/* Suppression spécifique pour Internet Explorer */
+select::-ms-expand {
+    display: none !important;
+}
+
+/* Suppression pour les navigateurs basés sur WebKit */
+select::-webkit-calendar-picker-indicator,
+select::-webkit-datetime-edit-fields-wrapper,
+select::-webkit-datetime-edit-text,
+select::-webkit-inner-spin-button,
+select::-webkit-outer-spin-button {
+    display: none !important;
+    -webkit-appearance: none !important;
+}
+
+/* Scrollbars personnalisées quasi-invisibles */
+/* Pour les navigateurs WebKit (Chrome, Safari, Edge) */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: rgba(156, 163, 175, 0.3); /* gray-400 avec transparence */
+    border-radius: 3px;
+    transition: background-color 0.2s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(156, 163, 175, 0.5); /* gray-400 plus visible au hover */
+}
+
+/* Mode sombre */
+.dark ::-webkit-scrollbar-thumb {
+    background: rgba(75, 85, 99, 0.3); /* gray-600 avec transparence */
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+    background: rgba(75, 85, 99, 0.5); /* gray-600 plus visible au hover */
+}
+
+/* Pour Firefox */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(156, 163, 175, 0.3) transparent;
+}
+
+.dark * {
+    scrollbar-color: rgba(75, 85, 99, 0.3) transparent;
+}
