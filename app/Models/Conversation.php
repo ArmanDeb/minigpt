@@ -6,61 +6,23 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-/**
- * MODÈLE ELOQUENT - CONVERSATION
- *
- * Représente une conversation entre un utilisateur et l'IA.
- *
- * Pattern Active Record : Chaque instance de cette classe
- * correspond à une ligne dans la table 'conversations'.
- *
- * Relations :
- * - BelongsTo : User (une conversation appartient à un utilisateur)
- * - HasMany : Messages (une conversation contient plusieurs messages)
- *
- * Fonctionnalités :
- * - Gestion des modèles IA par conversation
- * - Système de favoris pour l'organisation
- * - Titre auto-généré par l'IA
- * - Suivi de la dernière activité pour le tri
- */
 class Conversation extends Model
 {
-    /**
-     * Assignation en masse : Attributs modifiables en masse
-     *
-     * Sécurité : Seuls ces champs peuvent être remplis
-     * via create() ou update() avec un tableau.
-     */
     protected $fillable = [
         'user_id',
-        'title',            // Titre auto-généré par l'IA
-        'model',           // Modèle IA utilisé (peut changer en cours)
-        'last_activity_at', // Pour tri chronologique des conversations
-        'is_favorite',     // Système de favoris utilisateur
+        'title',
+        'model',
+        'last_activity_at',
+        'is_favorite',
     ];
 
-    /**
-     * Conversion automatique des types de données
-     *
-     * Laravel convertit automatiquement :
-     * - last_activity_at en objet Carbon pour manipulation dates
-     * - is_favorite en boolean pour éviter les erreurs de type
-     */
     protected $casts = [
         'last_activity_at' => 'datetime',
         'is_favorite' => 'boolean',
     ];
 
     /**
-     * RELATION ELOQUENT : APPARTENANCE À UN UTILISATEUR
-     *
-     * Pattern One-to-Many inversé : Plusieurs conversations
-     * appartiennent à un utilisateur.
-     *
-     * Génère automatiquement les requêtes JOIN nécessaires.
-     *
-     * @return BelongsTo
+     * Get the user that owns the conversation.
      */
     public function user(): BelongsTo
     {
@@ -68,15 +30,7 @@ class Conversation extends Model
     }
 
     /**
-     * RELATION ELOQUENT : POSSESSION DE MESSAGES
-     *
-     * Pattern One-to-Many : Une conversation contient
-     * plusieurs messages triés par ordre chronologique.
-     *
-     * L'ordre ASC garantit l'affichage chronologique correct
-     * dans l'interface de chat.
-     *
-     * @return HasMany
+     * Get the messages for the conversation.
      */
     public function messages(): HasMany
     {
@@ -84,15 +38,7 @@ class Conversation extends Model
     }
 
     /**
-     * MÉTHODE UTILITAIRE : DERNIER MESSAGE
-     *
-     * Récupère le message le plus récent de la conversation.
-     * Utilisé pour l'aperçu dans la liste des conversations.
-     *
-     * Pattern Query Builder : Construit une requête optimisée
-     * au lieu de charger tous les messages.
-     *
-     * @return Message|null
+     * Get the last message in the conversation.
      */
     public function lastMessage()
     {

@@ -1,209 +1,110 @@
-<!--
-/******************************************************************************
- * COMPOSANT VUE.JS PRINCIPAL - INTERFACE DE CHAT IA
- *
- * Architecture SPA (Single Page Application) avec Vue.js 3 Composition API
- *
- * Responsabilités :
- * - Interface utilisateur complète du chat
- * - Gestion d'état réactif (conversations, messages, UI)
- * - Streaming temps réel des réponses IA
- * - Communication avec le backend Laravel via Inertia.js
- *
- * Patterns utilisés :
- * - Composition API (Vue 3) pour une meilleure réutilisabilité
- * - Reactive Programming avec watchers
- * - Component-based Architecture
- * - State Management local avec computed properties
- *
- * Technologies :
- * - Vue.js 3 avec Composition API
- * - Inertia.js pour l'hybride SPA/traditional
- * - TailwindCSS pour le styling
- * - Server-Sent Events pour le streaming
- ******************************************************************************/
--->
-
 <script setup>
-// IMPORTS VUE.JS - COMPOSITION API
 import { ref, computed, nextTick, watch, onMounted } from 'vue';
-
-// IMPORTS INERTIA.JS - PONT LARAVEL/VUE.JS
 import { Head, useForm, usePage, Link, router } from '@inertiajs/vue3';
-
-// IMPORTS UTILITAIRES
 import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { useStream } from '@laravel/stream-vue'; // Package Laravel pour streaming
-import axios from 'axios';
-
-// IMPORTS COMPOSANTS - ARCHITECTURE MODULAIRE
+import { useStream } from '@laravel/stream-vue';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import ConversationList from '@/Components/ConversationList.vue';
 import MessageList from '@/Components/MessageList.vue';
 import MessageForm from '@/Components/MessageForm.vue';
 import ModelSelector from '@/Components/ModelSelector.vue';
+import axios from 'axios';
 
-/**
- * PROPS - DONNÉES TRANSMISES DEPUIS LARAVEL VIA INERTIA
- *
- * Pattern Data Transfer Object : Toutes les données nécessaires
- * sont préparées côté serveur et transmises au composant.
- */
 const props = defineProps({
     models: {
         type: Array,
-        required: true          // Liste des modèles IA disponibles
+        required: true
     },
     selectedModel: {
         type: String,
-        default: ''             // Modèle IA sélectionné par défaut
+        default: ''
     },
     conversations: {
         type: Array,
-        default: () => []       // Historique des conversations utilisateur
+        default: () => []
     },
     conversation: {
         type: Object,
-        default: null           // Conversation actuelle (si mode 'show')
+        default: null
     },
     mode: {
         type: String,
-        default: 'create'       // Mode d'affichage : 'create', 'show', 'list'
+        default: 'create' // 'create', 'show', 'list'
     },
     initialMessage: {
         type: String,
-        default: ''             // Message initial (rarement utilisé)
+        default: ''
     }
 });
 
-// ÉTAT GLOBAL DE L'APPLICATION
-const page = usePage(); // Hook Inertia pour accéder aux données partagées
-
-/**
- * FORMULAIRE RÉACTIF - PATTERN INERTIA FORMS
- *
- * useForm() gère automatiquement :
- * - État du formulaire
- * - Validation
- * - Soumission avec gestion d'erreurs
- * - Indicateurs de chargement
- */
+const page = usePage();
 const form = useForm({
     message: '',
     model: props.selectedModel || (props.models.length > 0 ? props.models[0].id : '')
 });
 
-/**
- * ÉTAT RÉACTIF LOCAL - COMPOSITION API
- *
- * Gestion de l'état de l'interface utilisateur avec Vue 3 reactivity
- */
+// Initialisation des variables d'état
+const currentConversation = ref(props.conversation || null);
+const messages = ref(props.conversation?.messages || []);
+const isLoading = ref(false);
+const error = ref(null);
+const messageListRef = ref(null);
+const messagesContainer = ref(null);
+const localConversations = ref([...props.conversations]);
+const shouldResetForm = ref(false);
 
-// État principal de la conversation
-const currentConversation = ref(props.conversation || null);  // Conversation active
-const messages = ref(props.conversation?.messages || []);     // Messages de la conversation active
-const isLoading = ref(false);                                 // Indicateur de chargement
-const error = ref(null);                                      // Gestion des erreurs
+// Variables pour la sélection multiple
+const selectedConversations = ref(new Set());
+const isMultiSelectMode = ref(false);
 
-// Références DOM pour manipulation directe
-const messageListRef = ref(null);                             // Référence à la liste des messages
-const messagesContainer = ref(null);                          // Container pour auto-scroll
+// Variables pour le tri
+const sortBy = ref('recent'); // 'recent', 'favorites'
 
-// État local des conversations (pour optimisation UI)
-const localConversations = ref([...props.conversations]);     // Copie locale pour éviter mutations props
-const shouldResetForm = ref(false);                           // Flag pour réinitialisation formulaire
-
-// Fonctionnalités avancées de l'interface
-const selectedConversations = ref(new Set());                 // Sélection multiple pour suppression
-const isMultiSelectMode = ref(false);                         // Mode sélection multiple actif
-
-// Options de tri des conversations
-const sortBy = ref('recent');                                 // Critère de tri : 'recent', 'favorites'
-
-/**
- * FONCTIONS UTILITAIRES - GESTION DE L'INTERFACE
- */
-
-/**
- * Nettoyage des paramètres URL
- *
- * Pattern Single Responsibility : Maintient une URL propre
- * en supprimant les paramètres temporaires après utilisation.
- */
+// Fonction pour nettoyer l'URL des paramètres de requête
 const cleanUrlParameters = () => {
     const url = new URL(window.location.href);
     url.searchParams.delete('initial_message');
     window.history.replaceState({}, document.title, url.toString());
 };
 
-/**
- * Réinitialisation du formulaire de message
- *
- * Pattern State Management : Utilise un flag pour déclencher
- * la réinitialisation dans les composants enfants.
- */
+// Fonction pour réinitialiser le formulaire
 const resetMessageForm = () => {
     shouldResetForm.value = true;
 };
 
-/**
- * Callback de fin de réinitialisation
- *
- * Pattern Observer : Le composant enfant notifie la fin
- * de l'opération de réinitialisation.
- */
+// Fonction appelée quand la réinitialisation est terminée
 const onResetComplete = () => {
     shouldResetForm.value = false;
 };
 
-/**
- * Gestion des favoris - UX AVANCÉE
- *
- * Pattern Optimistic UI Updates : Met à jour l'interface
- * immédiatement puis synchronise avec le serveur.
- *
- * @param {Object} conversation - Conversation à modifier
- * @param {Event} event - Événement DOM à neutraliser
- */
+// Fonction pour toggle les favoris
 const toggleFavorite = (conversation, event) => {
-    // Empêche la propagation vers les éléments parents
     event.preventDefault();
     event.stopPropagation();
 
-    // Appel Inertia avec gestion optimiste
     router.post(
         route('conversations.toggle-favorite', conversation.id),
         {},
         {
-            preserveScroll: true,           // Maintient la position de scroll
+            preserveScroll: true,
             onSuccess: () => {
-                // MISE À JOUR OPTIMISTE - UX instantanée
+                // Update the conversation in the local data
                 conversation.is_favorite = !conversation.is_favorite;
-                // Force le re-rendu de la liste avec spread operator
+                // Force re-render of the conversations list
                 localConversations.value = [...localConversations.value];
             }
         }
     );
 };
 
-/**
- * Auto-scroll vers le bas - UX CHAT
- *
- * Pattern Asynchronous UI Updates : Utilise nextTick pour
- * s'assurer que le DOM est mis à jour avant le scroll.
- *
- * Technique avancée : Double vérification avec setTimeout
- * pour gérer les cas où la référence DOM n'est pas prête.
- */
+// Fonction pour faire défiler vers le bas
 const scrollToBottom = async () => {
-    await nextTick(); // Attendre le prochain cycle de rendu Vue.js
-
+    await nextTick();
     if (messagesContainer.value) {
-        // Scroll immédiat vers le bas du container
         messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight;
     } else {
-        // FALLBACK : Si la référence n'est pas prête, réessayer
+        // Si la référence n'est pas encore disponible, réessayer après un court délai
         setTimeout(() => {
             if (messagesContainer.value) {
                 messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight;
@@ -212,20 +113,7 @@ const scrollToBottom = async () => {
     }
 };
 
-/**
- * COMPUTED PROPERTIES - DONNÉES RÉACTIVES CALCULÉES
- *
- * Pattern Computed Properties : Ces fonctions se recalculent
- * automatiquement quand leurs dépendances changent.
- */
-
-/**
- * Liste unifiée des conversations
- *
- * Pattern State Reconciliation : Combine les conversations
- * existantes avec la conversation courante si elle n'est
- * pas encore dans la liste (optimisation UI).
- */
+// Liste combinée des conversations (existantes + nouvelle)
 const allConversations = computed(() => {
     if (currentConversation.value && !localConversations.value.some(conv => conv.id === currentConversation.value.id)) {
         return [currentConversation.value, ...localConversations.value];
@@ -233,83 +121,49 @@ const allConversations = computed(() => {
     return localConversations.value;
 });
 
-/**
- * Tri intelligent des conversations
- *
- * Pattern Strategy : Applique différents algorithmes de tri
- * selon la préférence utilisateur.
- *
- * Algorithmes :
- * - 'favorites' : Favoris en premier, puis chronologique
- * - 'recent' : Tri chronologique pur (défaut)
- */
+// Conversations triées selon le critère sélectionné
 const sortedConversations = computed(() => {
     const conversations = [...props.conversations];
 
     if (sortBy.value === 'favorites') {
-        // ALGORITHME DE TRI COMPLEXE : Favoris + Chronologique
+        // Trier par favoris d'abord, puis par dernière activité
         return conversations.sort((a, b) => {
-            // Priorité 1 : Favoris en premier
             if (a.is_favorite && !b.is_favorite) return -1;
             if (!a.is_favorite && b.is_favorite) return 1;
-
-            // Priorité 2 : Tri chronologique (si même statut favori)
+            // Si même statut de favori, trier par dernière activité
             return new Date(b.last_activity_at || b.updated_at) - new Date(a.last_activity_at || a.updated_at);
         });
     }
 
-    // TRI PAR DÉFAUT : Plus récent en premier
+    // Tri par défaut : récent
     return conversations.sort((a, b) => {
         return new Date(b.last_activity_at || b.updated_at) - new Date(a.last_activity_at || a.updated_at);
     });
 });
 
-/**
- * Titre dynamique de la page
- *
- * Pattern Dynamic Title : Le titre s'adapte selon le contexte
- * de navigation pour une meilleure UX.
- */
 const pageTitle = computed(() => {
     if (props.mode === 'list') return 'Conversations';
     if (props.mode === 'show' && currentConversation.value) {
-        // Titre réactif qui se met à jour avec les modifications
+        // S'assurer que le titre est réactif
         return currentConversation.value.title || 'Nouvelle conversation';
     }
     return 'Nouvelle conversation';
 });
 
-/**
- * Messages flash de Laravel
- *
- * Pattern Flash Messages : Récupère les messages temporaires
- * transmis par Laravel via les sessions.
- */
 const displayedResponse = computed(() => {
     return page.props.flash.message || '';
 });
 
-/**
- * Nom du modèle IA sélectionné
- *
- * Pattern Data Transformation : Convertit l'ID du modèle
- * en nom lisible pour l'affichage utilisateur.
- */
 const getSelectedModelName = computed(() => {
-    // Récupération de l'ID du modèle actuel
+    // Utiliser le modèle du formulaire qui est maintenant synchronisé
     const modelId = form.model || (props.models.length > 0 ? props.models[0].id : '');
 
-    // Résolution ID → Nom via recherche dans la liste
+    // Trouver le nom du modèle à partir de son ID
     const model = props.models.find(m => m.id === modelId);
     return model ? model.name : modelId;
 });
 
-/**
- * URL dynamique pour le streaming
- *
- * Pattern Dynamic URL Generation : Génère l'URL de streaming
- * selon la conversation active.
- */
+// URL dynamique pour le stream
 const getStreamUrl = computed(() => {
     if (!currentConversation.value?.id) return null;
     return `/conversations/${currentConversation.value.id}/stream`;

@@ -1,53 +1,22 @@
 <script setup>
-/**
- * LAYOUT PRINCIPAL - ARCHITECTURE VUE.JS 3 COMPOSITION API
- *
- * Ce composant définit la structure générale de l'application avec :
- * - Sidebar responsive avec navigation et liste des conversations
- * - Header mobile adaptatif
- * - Menu utilisateur avec mode sombre/clair
- * - Gestion des favoris et conversations récentes
- *
- * Patterns utilisés :
- * - Composition API : setup() avec réactivité moderne
- * - Responsive Design : Desktop sidebar, mobile menu
- * - Dark Mode : Persistance des préférences utilisateur
- * - Component Slots : Injection du contenu principal
- */
 import { ref, computed } from 'vue';
 import { Head, Link, router, usePage } from '@inertiajs/vue3';
 import { useDarkMode } from '@/Composables/useDarkMode';
 
-/**
- * PROPS DU COMPOSANT
- *
- * title : Titre de la page affiché dans l'onglet navigateur
- */
 defineProps({
     title: String,
 });
 
-/**
- * ÉTAT RÉACTIF LOCAL
- *
- * Pattern Composition API : Variables réactives centralisées
- */
-const page = usePage();                    // Accès aux props globales Inertia
-const showingMobileMenu = ref(false);      // État menu mobile (ouvert/fermé)
-const { isDark, toggleDarkMode } = useDarkMode(); // Composable mode sombre
+const page = usePage();
+const showingMobileMenu = ref(false);
+const { isDark, toggleDarkMode } = useDarkMode();
 
-/**
- * COMPUTED PROPERTIES - DONNÉES DÉRIVÉES RÉACTIVES
- *
- * Pattern Reactive : Recalculé automatiquement quand les props changent
- */
-
-// Récupération des conversations depuis les props de la page
+// Récupérer les conversations depuis les props de la page
 const conversations = computed(() => {
     return page.props.conversations || [];
 });
 
-// Séparation des conversations favoris et récentes pour organisation UI
+// Séparer les conversations favoris et récentes
 const favoriteConversations = computed(() => {
     return conversations.value.filter(conv => conv.is_favorite);
 });
@@ -56,43 +25,23 @@ const recentConversations = computed(() => {
     return conversations.value.filter(conv => !conv.is_favorite);
 });
 
-/**
- * MÉTHODES D'INTERACTION UTILISATEUR
- */
-
-/**
- * GESTION DES FAVORIS - TOGGLE AJAX
- *
- * Pattern Optimistic UI : Mise à jour immédiate de l'interface
- * avant confirmation serveur pour une UX fluide
- *
- * @param {Object} conversation - Objet conversation à modifier
- * @param {Event} event - Événement DOM pour contrôle propagation
- */
 const toggleFavorite = (conversation, event) => {
-    // Empêche la navigation vers la conversation lors du clic sur favori
     event.preventDefault();
     event.stopPropagation();
 
-    // Appel AJAX avec Inertia pour mise à jour serveur
     router.post(
         route('conversations.toggle-favorite', conversation.id),
         {},
         {
-            preserveScroll: true,  // Maintient la position de scroll
+            preserveScroll: true,
             onSuccess: () => {
-                // Mise à jour optimiste de l'état local
+                // Update the conversation in the local data
                 conversation.is_favorite = !conversation.is_favorite;
             }
         }
     );
 };
 
-/**
- * DÉCONNEXION UTILISATEUR
- *
- * Appel route Laravel logout avec redirection automatique
- */
 const logout = () => {
     router.post(route('logout'));
 };
@@ -100,37 +49,13 @@ const logout = () => {
 
 <template>
     <div>
-        <!--
-            HEAD SECTION - MÉTADONNÉES PAGE
-            Inertia.js gère automatiquement le <title> et autres meta tags
-        -->
         <Head :title="title" />
 
-        <!--
-            LAYOUT PRINCIPAL - ARCHITECTURE RESPONSIVE
-
-            Structure Flexbox :
-            - Desktop : Sidebar fixe + Contenu principal
-            - Mobile : Header + Menu déroulant + Contenu
-        -->
         <div class="flex h-screen bg-white dark:bg-gray-900">
-            <!--
-                SIDEBAR DESKTOP - NAVIGATION PRINCIPALE
-
-                Features :
-                - Masquée sur mobile (hidden md:flex)
-                - Largeur fixe 64 unités Tailwind
-                - Scroll vertical pour liste conversations
-                - Organisation par favoris/récentes
-            -->
+            <!-- Sidebar -->
             <div class="hidden md:flex md:w-64 md:flex-col">
                 <div class="flex flex-col flex-grow pt-5 bg-gray-50 dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 overflow-y-auto">
-                    <!--
-                        LOGO ET BRANDING
-
-                        Design : Gradient coloré avec icône chat
-                        Navigation : Clic logo → Nouvelle conversation
-                    -->
+                    <!-- Logo -->
                     <div class="flex items-center flex-shrink-0 px-4 mb-6">
                         <Link :href="route('conversations.create')" class="flex items-center space-x-3">
                             <div class="w-8 h-8 bg-gradient-to-br from-orange-400 via-red-400 to-pink-400 rounded-xl flex items-center justify-center">
@@ -144,12 +69,7 @@ const logout = () => {
                         </Link>
                     </div>
 
-                    <!--
-                        BOUTON NOUVELLE CONVERSATION
-
-                        UX : Action principale mise en évidence
-                        Design : Gradient identique au logo pour cohérence
-                    -->
+                    <!-- Nouvelle conversation -->
                     <div class="px-4 mb-6">
                         <Link
                             :href="route('conversations.create')"
@@ -162,15 +82,7 @@ const logout = () => {
                         </Link>
                     </div>
 
-                    <!--
-                        NAVIGATION SECONDAIRE
-
-                        Liens vers :
-                        - Liste complète des conversations
-                        - Configuration instructions personnalisées IA
-
-                        Pattern : État actif avec classes conditionnelles
-                    -->
+                    <!-- Navigation -->
                     <nav class="px-4 space-y-2 mb-6">
                         <!-- Mes conversations -->
                         <Link
@@ -206,24 +118,12 @@ const logout = () => {
                         </Link>
                     </nav>
 
-                    <!-- Séparateur visuel -->
+                    <!-- Séparateur -->
                     <div class="px-4 mb-4">
                         <div class="border-t border-gray-200 dark:border-gray-600"></div>
                     </div>
 
-                    <!--
-                        LISTE DES CONVERSATIONS - ORGANISATION INTELLIGENTE
-
-                        Architecture :
-                        1. Section Favoris (si présents)
-                        2. Section Récentes
-
-                        UX Features :
-                        - Limitation du nombre affiché (5/10)
-                        - Boutons favoris avec hover states
-                        - Indicateur conversation active
-                        - Truncation des titres longs
-                    -->
+                    <!-- Liste des conversations -->
                     <div class="flex-1 px-4 pb-4">
                         <!-- Section Favoris -->
                         <div v-if="favoriteConversations.length > 0" class="mb-4">
@@ -239,7 +139,6 @@ const logout = () => {
                                     :key="'fav-' + conversation.id"
                                     class="group relative"
                                 >
-                                    <!-- Lien conversation avec état actif -->
                                     <Link
                                         :href="route('conversations.show', conversation.id)"
                                         :class="[
@@ -254,7 +153,6 @@ const logout = () => {
                                         </svg>
                                         <span class="truncate">{{ conversation.title }}</span>
                                     </Link>
-                                    <!-- Bouton retirer des favoris -->
                                     <button
                                         @click="toggleFavorite(conversation, $event)"
                                         class="absolute top-2 right-2 text-yellow-400 hover:text-yellow-500 transition-colors opacity-70 hover:opacity-100"
@@ -293,7 +191,6 @@ const logout = () => {
                                     </svg>
                                     <span class="truncate">{{ conversation.title }}</span>
                                 </Link>
-                                    <!-- Bouton ajouter aux favoris (visible au hover) -->
                                     <button
                                         @click="toggleFavorite(conversation, $event)"
                                         class="absolute top-2 right-2 text-gray-300 hover:text-yellow-400 dark:text-gray-600 dark:hover:text-yellow-400 transition-colors opacity-0 group-hover:opacity-100"
@@ -308,22 +205,13 @@ const logout = () => {
                         </div>
                     </div>
 
-                    <!--
-                        MENU UTILISATEUR - ZONE INFÉRIEURE SIDEBAR
-
-                        Features :
-                        - Avatar avec initiale utilisateur
-                        - Menu dropdown avec profil/déconnexion
-                        - Toggle mode sombre/clair
-                        - Design cohérent avec le reste de l'interface
-                    -->
+                    <!-- Menu utilisateur en bas -->
                     <div class="p-4 border-t border-gray-200 dark:border-gray-600">
                         <div class="relative">
                             <button
                                 @click="showingMobileMenu = !showingMobileMenu"
                                 class="flex items-center w-full px-4 py-3 text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-white dark:hover:bg-gray-700 rounded-xl transition-all duration-200"
                             >
-                                <!-- Avatar utilisateur -->
                                 <div class="w-8 h-8 bg-gray-200 dark:bg-gray-600 rounded-full flex items-center justify-center mr-3">
                                     <span class="text-xs font-medium text-gray-600 dark:text-gray-300">
                                         {{ $page.props.auth.user.name.charAt(0).toUpperCase() }}
@@ -332,7 +220,6 @@ const logout = () => {
                                 <div class="flex-1 text-left">
                                     <div class="font-medium">{{ $page.props.auth.user.name }}</div>
                                 </div>
-                                <!-- Icône menu -->
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h.01M12 12h.01M19 12h.01"></path>
                                 </svg>
@@ -344,7 +231,6 @@ const logout = () => {
                                 @click.away="showingMobileMenu = false"
                                 class="absolute bottom-full left-0 right-0 mb-2 bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 py-2"
                             >
-                                <!-- Lien profil -->
                                 <Link
                                     :href="route('profile.show')"
                                     class="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-200"
@@ -357,21 +243,16 @@ const logout = () => {
                                     @click="toggleDarkMode"
                                     class="flex items-center w-full px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-200"
                                 >
-                                    <!-- Icône lune (mode sombre) -->
                                     <svg v-if="!isDark" class="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path>
                                     </svg>
-                                    <!-- Icône soleil (mode clair) -->
                                     <svg v-else class="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path>
                                     </svg>
                                     {{ isDark ? 'Mode clair' : 'Mode sombre' }}
                                 </button>
 
-                                <!-- Séparateur -->
                                 <div class="border-t border-gray-100 dark:border-gray-600 my-1"></div>
-
-                                <!-- Bouton déconnexion -->
                                 <button
                                     @click="logout"
                                     class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-200"
@@ -384,24 +265,11 @@ const logout = () => {
                 </div>
             </div>
 
-            <!--
-                CONTENU PRINCIPAL - ZONE FLEXIBLE
-
-                Architecture :
-                - Header mobile (masqué sur desktop)
-                - Menu mobile déroulant
-                - Slot pour contenu des pages
-            -->
+            <!-- Contenu principal -->
             <div class="flex-1 flex flex-col overflow-hidden">
-                <!--
-                    HEADER MOBILE - NAVIGATION COMPACTE
-
-                    Visible uniquement sur mobile (md:hidden)
-                    Contient logo + bouton menu hamburger
-                -->
+                <!-- Header mobile -->
                 <div class="md:hidden bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 px-4 py-3">
                     <div class="flex items-center justify-between">
-                        <!-- Logo mobile -->
                         <Link :href="route('conversations.create')" class="flex items-center space-x-3">
                             <div class="w-8 h-8 bg-gradient-to-br from-orange-400 via-red-400 to-pink-400 rounded-xl flex items-center justify-center">
                                 <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -413,12 +281,10 @@ const logout = () => {
                             </span>
                         </Link>
 
-                        <!-- Bouton menu hamburger -->
                         <button
                             @click="showingMobileMenu = !showingMobileMenu"
                             class="p-2 rounded-md text-gray-400 dark:text-gray-500 hover:text-gray-500 dark:hover:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors duration-200"
                         >
-                            <!-- Icône hamburger / X avec transition -->
                             <svg class="w-6 h-6" stroke="currentColor" fill="none" viewBox="0 0 24 24">
                                 <path
                                     :class="{'hidden': showingMobileMenu, 'inline-flex': !showingMobileMenu }"
@@ -435,14 +301,7 @@ const logout = () => {
                     </div>
                 </div>
 
-                <!--
-                    MENU MOBILE DÉROULANT
-
-                    Réplique de la sidebar desktop adaptée au mobile :
-                    - Navigation principale
-                    - Conversations récentes (limitées)
-                    - Menu utilisateur complet
-                -->
+                <!-- Menu mobile -->
                 <div
                     v-show="showingMobileMenu"
                     class="md:hidden bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700"
@@ -459,7 +318,6 @@ const logout = () => {
                             Nouvelle conversation
                         </Link>
 
-                        <!-- Navigation mobile -->
                         <Link
                             :href="route('conversations.index')"
                             :class="[
@@ -491,7 +349,7 @@ const logout = () => {
                             Instructions personnalisées
                         </Link>
 
-                        <!-- Conversations récentes mobile (limitées à 5) -->
+                        <!-- Conversations récentes mobile -->
                         <div v-if="conversations.length > 0" class="pt-4">
                             <div class="border-t border-gray-200 dark:border-gray-700 pt-4">
                                 <h3 class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3 px-3">
@@ -516,7 +374,6 @@ const logout = () => {
 
                     <!-- Menu utilisateur mobile -->
                     <div class="px-4 pt-4 pb-3 border-t border-gray-200 dark:border-gray-700">
-                        <!-- Informations utilisateur -->
                         <div class="flex items-center mb-3">
                             <div class="w-10 h-10 bg-gray-200 dark:bg-gray-600 rounded-full flex items-center justify-center">
                                 <span class="text-sm font-medium text-gray-600 dark:text-gray-300">
@@ -528,8 +385,6 @@ const logout = () => {
                                 <div class="font-medium text-sm text-gray-500 dark:text-gray-400">{{ $page.props.auth.user.email }}</div>
                             </div>
                         </div>
-
-                        <!-- Actions utilisateur mobile -->
                         <div class="space-y-1">
                             <Link
                                 :href="route('profile.show')"
@@ -562,13 +417,7 @@ const logout = () => {
                     </div>
                 </div>
 
-                <!--
-                    CONTENU PRINCIPAL - SLOT PATTERN
-
-                    Zone où s'affiche le contenu des pages individuelles.
-                    Pattern Vue.js : <slot /> permet l'injection de contenu
-                    depuis les composants parents.
-                -->
+                <!-- Contenu principal -->
                 <main class="flex-1 overflow-y-auto bg-white dark:bg-gray-900">
                     <slot />
                 </main>

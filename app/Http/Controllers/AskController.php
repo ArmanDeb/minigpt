@@ -10,50 +10,21 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
 
-/**
- * CONTRÔLEUR PRINCIPAL - GESTION DES CONVERSATIONS ET MESSAGES
- *
- * Pattern MVC : Ce contrôleur orchestre toutes les interactions
- * entre l'utilisateur et le système de chat IA.
- *
- * Responsabilités principales :
- * - Gestion du cycle de vie des conversations
- * - Coordination des messages (envoi, réception, streaming)
- * - Interface entre Vue.js (Inertia) et les services backend
- * - Validation des données et contrôle d'accès
- */
 class AskController extends Controller
 {
     protected $chatService;
 
-    /**
-     * INJECTION DE DÉPENDANCE - PATTERN DI
-     *
-     * Le ChatService est injecté automatiquement par Laravel,
-     * facilitant les tests et la maintenance du code.
-     */
     public function __construct(ChatService $chatService)
     {
         $this->chatService = $chatService;
     }
 
-    /**
-     * REDIRECTION AUTOMATIQUE VERS L'INTERFACE DE CHAT
-     *
-     * Simplifie l'UX en évitant une page intermédiaire inutile
-     */
     public function index()
     {
         // Rediriger directement vers la création d'une nouvelle conversation
         return redirect()->route('conversations.create');
     }
 
-    /**
-     * ANCIEN ENDPOINT - CONSERVÉ POUR COMPATIBILITÉ
-     *
-     * Cette méthode n'est plus utilisée dans l'interface actuelle
-     * mais pourrait servir pour des appels API directs.
-     */
     public function ask(Request $request)
     {
         $request->validate([
@@ -84,76 +55,49 @@ class AskController extends Controller
     }
 
     /**
-     * AFFICHAGE DE L'INTERFACE DE CHAT PRINCIPALE
-     *
-     * Point d'entrée principal de l'application.
-     * Prépare toutes les données nécessaires pour Vue.js.
-     *
-     * Pattern Data Transfer Object : Toutes les données sont
-     * structurées et transmises en une fois à Inertia.
+     * Show the form for creating a new conversation.
      */
     public function createConversation()
     {
-        // 1. RÉCUPÉRATION DES MODÈLES IA DISPONIBLES (avec cache)
         $models = (new ChatService())->getModels();
-
-        // 2. DÉTERMINATION DU MODÈLE PRÉFÉRÉ
-        // Utilise le modèle sauvegardé de l'utilisateur ou le défaut
         $selectedModel = Auth::check() && Auth::user()->preferred_model
             ? Auth::user()->preferred_model
             : ChatService::DEFAULT_MODEL;
 
-        // 3. RÉCUPÉRATION DES CONVERSATIONS POUR LA SIDEBAR
-        // Pattern Eager Loading : On charge les relations en une requête
-        // pour éviter le problème N+1
+        // Get user's conversations for the sidebar
         $conversations = Auth::check()
             ? Auth::user()->conversations()
                 ->with(['messages' => function ($query) {
-                    $query->latest()->limit(1); // Seul le dernier message pour l'aperçu
+                    $query->latest()->limit(1);
                 }])
-                ->orderBy('is_favorite', 'desc')    // Favoris en premier
-                ->orderBy('last_activity_at', 'desc') // Puis par activité récente
+                ->orderBy('is_favorite', 'desc')
+                ->orderBy('last_activity_at', 'desc')
                 ->get()
             : [];
 
-        // 4. RENDU VUE.JS AVEC INERTIA
-        // Pattern Single Page Application : Une seule page Vue.js
-        // qui gère tous les états (create, show, list)
         return Inertia::render('Ask/ChatInterface', [
             'models' => $models,
             'selectedModel' => $selectedModel,
             'conversations' => $conversations,
-            'mode' => 'create' // Indique à Vue.js le mode d'affichage
+            'mode' => 'create'
         ]);
     }
 
     /**
-     * CRÉATION D'UNE NOUVELLE CONVERSATION AVEC PREMIER MESSAGE
-     *
-     * Workflow complet :
-     * 1. Validation des données
-     * 2. Création de la conversation
-     * 3. Sauvegarde du message utilisateur
-     * 4. Appel à l'IA pour la réponse
-     * 5. Génération automatique du titre
-     * 6. Redirection vers la conversation créée
+     * Store a newly created conversation.
      */
     public function storeConversation(Request $request)
     {
-        // VALIDATION DES ENTRÉES UTILISATEUR
         $request->validate([
             'message' => 'required|string',
             'model' => 'required|string',
         ]);
 
-        // SAUVEGARDE DU MODÈLE PRÉFÉRÉ - UX IMPROVEMENT
-        // L'utilisateur n'a pas besoin de re-sélectionner à chaque fois
+        // Sauvegarder le modèle choisi par l'utilisateur
         if (Auth::check()) {
             Auth::user()->update(['preferred_model' => $request->model]);
         }
 
-        // CRÉATION DE LA CONVERSATION
-        // Titre temporaire basé sur le début du message
         $conversation = Conversation::create([
             'user_id' => Auth::id(),
             'title' => substr($request->message, 0, 50) . (strlen($request->message) > 50 ? '...' : ''),
@@ -161,43 +105,39 @@ class AskController extends Controller
             'last_activity_at' => now(),
         ]);
 
-        // SAUVEGARDE DU MESSAGE UTILISATEUR
+        // Create the user message
         $message = Message::create([
             'conversation_id' => $conversation->id,
             'role' => 'user',
             'content' => $request->message,
         ]);
 
-        // APPEL À L'IA ET GESTION DE LA RÉPONSE
+        // Get AI response
         try {
             $messages = [[
                 'role' => 'user',
                 'content' => $request->message,
             ]];
 
-            // Appel synchrone pour la première création
             $response = (new ChatService())->sendMessage(
                 messages: $messages,
                 model: $request->model
             );
 
-            // SAUVEGARDE DE LA RÉPONSE IA
+            // Create the assistant message
             $assistantMessage = Message::create([
                 'conversation_id' => $conversation->id,
                 'role' => 'assistant',
                 'content' => $response,
             ]);
 
-            // GÉNÉRATION AUTOMATIQUE DU TITRE
-            // Utilise l'IA pour créer un titre pertinent
+            // Générer un titre pour la conversation
             $this->generateConversationTitle($conversation, $request->message, $response);
 
-            // RECHARGEMENT AVEC RELATIONS
+            // Recharger la conversation avec ses messages
             $conversation->load('messages');
 
-            // RÉPONSE ADAPTÉE AU TYPE DE REQUÊTE
             if ($request->wantsJson()) {
-                // Pour les appels AJAX
                 return response()->json([
                     'conversation' => $conversation,
                     'userMessage' => $message,
@@ -205,10 +145,8 @@ class AskController extends Controller
                 ]);
             }
 
-            // Redirection classique
             return redirect()->route('conversations.show', $conversation);
         } catch (\Exception $e) {
-            // GESTION D'ERREURS ADAPTÉE
             if ($request->wantsJson()) {
                 return response()->json(['error' => $e->getMessage()], 500);
             }
@@ -217,18 +155,11 @@ class AskController extends Controller
     }
 
     /**
-     * GÉNÉRATION AUTOMATIQUE DU TITRE DE CONVERSATION
-     *
-     * Fonctionnalité UX avancée : Utilise l'IA pour créer
-     * des titres pertinents basés sur le contenu de la conversation.
-     *
-     * Pattern Strategy : L'IA elle-même génère le titre,
-     * garantissant une cohérence avec le contenu.
+     * Génère un titre pour la conversation en utilisant l'API
      */
     private function generateConversationTitle($conversation, $userMessage, $aiResponse)
     {
         try {
-            // PROMPT SPÉCIALISÉ POUR LA GÉNÉRATION DE TITRE
             $prompt = "Génère un titre court (maximum 5 mots) pour une conversation basée sur ce message utilisateur et cette réponse AI. Ne mets pas de guillemets autour du titre.\n\nMessage utilisateur: {$userMessage}\n\nRéponse AI: {$aiResponse}";
 
             $messages = [[
@@ -236,43 +167,36 @@ class AskController extends Controller
                 'content' => $prompt,
             ]];
 
-            // APPEL IA POUR GÉNÉRER LE TITRE
             $title = (new ChatService())->sendMessage(
                 messages: $messages,
                 model: $conversation->model
             );
 
-            // NETTOYAGE ET LIMITATION DU TITRE
+            // Limiter le titre à 100 caractères
             $title = substr(trim($title), 0, 100);
 
-            // MISE À JOUR EN BASE DE DONNÉES
+            // Mettre à jour le titre de la conversation
             $conversation->update(['title' => $title]);
         } catch (\Exception $e) {
-            // EN CAS D'ERREUR, ON GARDE LE TITRE PAR DÉFAUT
-            // Principe : Ne jamais casser l'expérience utilisateur
+            // En cas d'erreur, on garde le titre par défaut
             logger()->error('Erreur lors de la génération du titre:', ['error' => $e->getMessage()]);
         }
     }
 
     /**
-     * AFFICHAGE D'UNE CONVERSATION EXISTANTE
-     *
-     * Charge une conversation avec tous ses messages
-     * et prépare l'interface pour la consultation/continuation.
+     * Display the specified conversation.
      */
     public function showConversation(Request $request, Conversation $conversation)
     {
-        // CONTRÔLE D'ACCÈS - SÉCURITÉ CRITIQUE
-        // Seul le propriétaire peut voir ses conversations
+        // Check if the conversation belongs to the authenticated user
         if ($conversation->user_id !== Auth::id()) {
             abort(403);
         }
 
-        // CHARGEMENT OPTIMISÉ DES RELATIONS
         $conversation->load('messages');
         $models = (new ChatService())->getModels();
 
-        // RÉCUPÉRATION DE TOUTES LES CONVERSATIONS POUR LA SIDEBAR
+        // Get user's conversations for the sidebar
         $conversations = Auth::user()->conversations()
             ->with(['messages' => function ($query) {
                 $query->latest()->limit(1);
@@ -281,18 +205,20 @@ class AskController extends Controller
             ->orderBy('last_activity_at', 'desc')
             ->get();
 
-        // RENDU AVEC MODE 'SHOW'
+        // Récupérer le message initial s'il existe
+        $initialMessage = $request->query('initial_message', '');
+
         return Inertia::render('Ask/ChatInterface', [
-            'models' => $models,
-            'selectedModel' => $conversation->model,
-            'conversations' => $conversations,
             'conversation' => $conversation,
-            'mode' => 'show' // Vue.js adapte l'interface
+            'models' => $models,
+            'conversations' => $conversations,
+            'mode' => 'show',
+            'initialMessage' => $initialMessage
         ]);
     }
 
     /**
-     * LISTE DES CONVERSATIONS - MODE LISTE
+     * Display a listing of the conversations.
      */
     public function conversationsList()
     {
@@ -318,51 +244,57 @@ class AskController extends Controller
     }
 
     /**
-     * ENVOI DE MESSAGE DANS CONVERSATION EXISTANTE (NON-STREAMING)
+     * Send a message in the conversation.
      */
     public function sendMessage(Request $request, Conversation $conversation)
     {
-        // Vérifier que la conversation appartient à l'utilisateur authentifié
+        // Check if the conversation belongs to the authenticated user
         if ($conversation->user_id !== Auth::id()) {
             abort(403);
         }
 
         $request->validate([
             'message' => 'required|string',
-            'model' => 'sometimes|string',
+            'model' => 'string',
         ]);
 
-        // Créer le message utilisateur
+        // Si un modèle est spécifié, on met à jour le modèle de la conversation et le modèle préféré de l'utilisateur
+        if ($request->has('model') && $request->model) {
+            $conversation->update(['model' => $request->model]);
+            Auth::user()->update(['preferred_model' => $request->model]);
+        }
+
+        // Create the user message
         $message = Message::create([
             'conversation_id' => $conversation->id,
             'role' => 'user',
             'content' => $request->message,
         ]);
 
-        // Mettre à jour la dernière activité
+        // Update conversation last activity
         $conversation->update([
             'last_activity_at' => now(),
-            'model' => $request->model ?? $conversation->model,
         ]);
 
+        // Get AI response
         try {
-            // Préparer les messages pour l'API
-            $apiMessages = $conversation
-                ->messages()
+            $messages = $conversation->messages()
+                ->orderBy('created_at', 'asc')
                 ->get()
-                ->map(function ($message) {
+                ->map(function ($msg) {
                     return [
-                        'role' => $message->role,
-                        'content' => $message->content,
+                        'role' => $msg->role,
+                        'content' => $msg->content,
                     ];
                 })
                 ->toArray();
 
             $response = (new ChatService())->sendMessage(
-                messages: $apiMessages,
-                model: $request->model ?? $conversation->model
+                messages: $messages,
+                model: $conversation->model
             );
 
+            // Create the assistant message
             $assistantMessage = Message::create([
                 'conversation_id' => $conversation->id,
                 'role' => 'assistant',
@@ -386,11 +318,11 @@ class AskController extends Controller
     }
 
     /**
-     * SUPPRESSION D'UNE CONVERSATION
+     * Remove the specified conversation.
      */
     public function destroyConversation(Request $request, Conversation $conversation)
     {
-        // Vérifier que la conversation appartient à l'utilisateur authentifié
+        // Check if the conversation belongs to the authenticated user
         if ($conversation->user_id !== Auth::id()) {
             abort(403);
         }
@@ -410,11 +342,11 @@ class AskController extends Controller
     }
 
     /**
-     * MISE À JOUR DU MODÈLE D'UNE CONVERSATION
+     * Update the model of a conversation.
      */
     public function updateConversationModel(Request $request, Conversation $conversation)
     {
-        // Vérifier que la conversation appartient à l'utilisateur authentifié
+        // Check if the conversation belongs to the authenticated user
         if ($conversation->user_id !== Auth::id()) {
             abort(403);
         }
@@ -438,69 +370,52 @@ class AskController extends Controller
     }
 
     /**
-     * STREAMING DE MESSAGES EN TEMPS RÉEL - CŒUR DU SYSTÈME
-     *
-     * Cette méthode implémente le streaming Server-Sent Events (SSE)
-     * pour afficher les réponses de l'IA en temps réel.
-     *
-     * Workflow technique :
-     * 1. Validation et autorisation
-     * 2. Sauvegarde du message utilisateur
-     * 3. Préparation du contexte de conversation
-     * 4. Streaming de la réponse IA chunk par chunk
-     * 5. Sauvegarde finale du message complet
-     *
-     * Pattern Observer : Le client écoute les chunks via EventSource
+     * Send a message in the conversation with streaming response.
      */
     public function sendMessageStream(Request $request, Conversation $conversation)
     {
-        // CONTRÔLE D'ACCÈS STRICT
+        // Check if the conversation belongs to the authenticated user
         if ($conversation->user_id !== Auth::id()) {
             abort(403);
         }
 
-        // GESTION MULTI-PROTOCOLE : GET (EventSource) ET POST (Fetch)
-        // Flexibilité pour différents clients frontend
+        // Handle both POST and GET requests (GET for EventSource)
         if ($request->isMethod('get')) {
-            // EventSource : Paramètres dans l'URL (limitations des headers)
+            // For EventSource requests, get message from query parameters
             $message = $request->query('message');
             $modelId = $request->query('model', $conversation->model);
         } else {
-            // Fetch/Axios : Corps JSON avec headers personnalisés
+            // For POST requests (fetch/axios), get from JSON body
             $data = $request->json()->all();
             $message = $data['message'] ?? null;
             $modelId = $data['model'] ?? $conversation->model;
         }
 
-        // VALIDATION CRITIQUE DU MESSAGE
         if (empty($message)) {
-            abort(400, 'Paramètre message requis');
+            abort(400, 'Message parameter is required');
         }
 
-        // 1. SAUVEGARDE IMMÉDIATE DU MESSAGE UTILISATEUR
-        // Important : Sauvegarder avant l'appel IA pour éviter les pertes
+        // Créer le message utilisateur
         Message::create([
             'conversation_id' => $conversation->id,
             'role' => 'user',
             'content' => $message,
         ]);
 
-        // 2. MISE À JOUR DES MÉTADONNÉES DE CONVERSATION
+        // Update conversation last activity
         $conversation->update([
-            'last_activity_at' => now(),        // Pour le tri chronologique
-            'model' => $modelId,                 // Changement de modèle possible
+            'last_activity_at' => now(),
+            'model' => $modelId, // Update model if provided
         ]);
 
-        // 3. SYNCHRONISATION DU MODÈLE PRÉFÉRÉ UTILISATEUR
+        // Update user's preferred model
         Auth::user()->update(['preferred_model' => $modelId]);
 
-        // 4. PRÉPARATION DU CONTEXTE CONVERSATIONNEL
-        // Récupération de TOUS les messages pour maintenir le contexte IA
+        // Préparer les messages pour l'API
         $apiMessages = $conversation
             ->messages()
             ->get()
             ->map(function ($message) {
-                // Format requis par l'API OpenAI
                 return [
                     'role' => $message->role,
                     'content' => $message->content,
@@ -508,45 +423,38 @@ class AskController extends Controller
             })
             ->toArray();
 
-        // 5. STREAMING RESPONSE - TECHNIQUE SSE
         return response()->stream(function () use ($conversation, $apiMessages) {
-            $fullResponse = ''; // Accumulation pour sauvegarde finale
+            $fullResponse = '';
 
-            // APPEL SERVICE STREAMING
             $stream = $this->chatService->stream(
                 messages: $apiMessages,
                 model: $conversation->model,
-                temperature: 0.7 // Équilibre créativité/précision
+                temperature: 0.7
             );
 
-            // ITÉRATION SUR CHAQUE CHUNK DE RÉPONSE
             foreach ($stream as $response) {
                 $content = $response->choices[0]->delta->content ?? '';
                 $fullResponse .= $content;
-
-                // ENVOI IMMÉDIAT AU CLIENT
-                echo $content; // Raw content pour compatibilité avec useStream
-                ob_flush();    // Force l'envoi du buffer PHP
-                flush();       // Force l'envoi du buffer serveur web
+                echo $content; // Send raw content without "data:" prefix for useStream
+                ob_flush();
+                flush();
             }
 
-            // 6. SAUVEGARDE FINALE DU MESSAGE COMPLET
-            // Une fois le streaming terminé, on sauvegarde la réponse complète
+            // Créer le message de l'assistant avec la réponse complète
             Message::create([
                 'conversation_id' => $conversation->id,
                 'role' => 'assistant',
                 'content' => $fullResponse,
             ]);
         }, 200, [
-            // HEADERS ESSENTIELS POUR SSE
-            'Cache-Control' => 'no-cache',           // Évite la mise en cache
-            'Content-Type' => 'text/event-stream',   // Type MIME pour SSE
-            'X-Accel-Buffering' => 'no',            // Nginx : pas de buffer
+            'Cache-Control' => 'no-cache',
+            'Content-Type' => 'text/event-stream',
+            'X-Accel-Buffering' => 'no',
         ]);
     }
 
     /**
-     * CRÉATION D'UNE CONVERSATION VIDE SANS MESSAGE INITIAL
+     * Create an empty conversation without initial message.
      */
     public function createEmptyConversation(Request $request)
     {
@@ -579,11 +487,11 @@ class AskController extends Controller
     }
 
     /**
-     * MISE À JOUR DU TITRE DE CONVERSATION BASÉ SUR LE PREMIER MESSAGE
+     * Update conversation title based on the first message.
      */
     public function updateConversationTitle(Request $request, Conversation $conversation)
     {
-        // Vérifier que la conversation appartient à l'utilisateur authentifié
+        // Check if the conversation belongs to the authenticated user
         if ($conversation->user_id !== Auth::id()) {
             abort(403);
         }
@@ -592,20 +500,20 @@ class AskController extends Controller
             'message' => 'required|string',
         ]);
 
-        // Obtenir le premier message utilisateur et la réponse IA
+        // Get the first user message and AI response
         $userMessage = $request->message;
 
-        // Obtenir la dernière réponse IA
+        // Get the last AI response
         $aiResponse = $conversation->messages()
             ->where('role', 'assistant')
             ->latest()
             ->first();
 
         if ($aiResponse) {
-            // Générer le titre en utilisant le premier message utilisateur et la réponse IA
+            // Generate title using the first user message and AI response
             $this->generateConversationTitle($conversation, $userMessage, $aiResponse->content);
 
-            // Retourner la conversation mise à jour
+            // Return the updated conversation
             return response()->json([
                 'success' => true,
                 'conversation' => $conversation->fresh()
@@ -614,16 +522,16 @@ class AskController extends Controller
 
         return response()->json([
             'success' => false,
-            'message' => 'Aucune réponse IA trouvée pour générer le titre'
+            'message' => 'No AI response found to generate title'
         ], 400);
     }
 
     /**
-     * BASCULER LE STATUT FAVORI DE LA CONVERSATION
+     * Toggle favorite status of the conversation.
      */
     public function toggleFavorite(Request $request, Conversation $conversation)
     {
-        // Vérifier que la conversation appartient à l'utilisateur authentifié
+        // Check if the conversation belongs to the authenticated user
         if ($conversation->user_id !== Auth::id()) {
             abort(403);
         }
@@ -643,7 +551,7 @@ class AskController extends Controller
     }
 
     /**
-     * SUPPRIMER PLUSIEURS CONVERSATIONS
+     * Remove multiple conversations.
      */
     public function destroyMultipleConversations(Request $request)
     {
@@ -654,22 +562,21 @@ class AskController extends Controller
 
         $conversationIds = $request->conversation_ids;
 
-        // Vérifier que toutes les conversations appartiennent à l'utilisateur authentifié
+        // Check if all conversations belong to the authenticated user
         $conversations = Conversation::whereIn('id', $conversationIds)
             ->where('user_id', Auth::id())
             ->get();
 
         if ($conversations->count() !== count($conversationIds)) {
-            abort(403, 'Vous ne pouvez supprimer que vos propres conversations');
+            abort(403, 'You can only delete your own conversations');
         }
 
-        // Supprimer toutes les conversations
-        Conversation::whereIn('id', $conversationIds)->delete();
+        // Delete all the conversations
+        Conversation::whereIn('id', $conversationIds)
+            ->where('user_id', Auth::id())
+            ->delete();
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Conversations supprimées avec succès',
-            'deleted_count' => count($conversationIds)
-        ]);
+        return redirect()->route('conversations.index')
+            ->with('success', count($conversationIds) . ' conversation(s) supprimée(s) avec succès.');
     }
 }
