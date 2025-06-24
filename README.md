@@ -1,61 +1,211 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# MiniGPT
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Une interface de chat élégante et moderne pour interagir avec l'IA, construite avec Laravel et Vue.js.
 
-## About Laravel
+## 📋 À propos du projet
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+MiniGPT est une application web qui permet aux utilisateurs de créer des conversations avec l'IA dans une interface intuitive et professionnelle. L'application offre une expérience utilisateur fluide avec gestion des conversations, instructions personnalisées, et authentification sécurisée.
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+## ✨ Fonctionnalités principales
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+- 💬 **Interface de chat moderne** : Conversation fluide avec l'IA
+- 📝 **Gestion des conversations** : Sauvegarde et organisation de vos discussions
+- ⭐ **Conversations favorites** : Marquez vos conversations importantes
+- 🎯 **Instructions personnalisées** : Configurez le comportement de l'IA selon vos besoins
+- 🔐 **Authentification sécurisée** : Système d'authentification complet avec 2FA
+- 🌙 **Mode sombre** : Interface adaptée à vos préférences
+- 📱 **Design responsive** : Utilisation optimale sur tous les appareils
+- 🤖 **Sélection de modèles** : Choisissez parmi différents modèles d'IA
 
-## Learning Laravel
+## 🛠️ Technologies utilisées
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+- **Backend** : Laravel 11, PHP 8.2+
+- **Frontend** : Vue.js 3, Inertia.js
+- **Styling** : Tailwind CSS
+- **Authentification** : Laravel Jetstream
+- **Base de données** : MySQL/PostgreSQL
+- **IA** : Intégration OpenAI API
 
-You may also try the [Laravel Bootcamp](https://bootcamp.laravel.com), where you will be guided through building a modern Laravel application from scratch.
+## 📋 Prérequis
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+Assurez-vous d'avoir installé les éléments suivants :
 
-## Laravel Sponsors
+- PHP 8.2 ou supérieur
+- Composer
+- Node.js 18+ et npm
+- MySQL 8.0+ ou PostgreSQL 13+
+- Extension PHP : BCMath, Ctype, Fileinfo, JSON, Mbstring, OpenSSL, PDO, Tokenizer, XML
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+## 🚀 Installation
 
-### Premium Partners
+### 1. Cloner le projet
 
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
+```bash
+git clone https://github.com/ArmanDeb/minigpt.git
+cd minigpt
+```
 
-## Contributing
+### 2. Installer les dépendances PHP
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+```bash
+composer install
+```
 
-## Code of Conduct
+### 3. Installer les dépendances Node.js
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+```bash
+npm install
+```
 
-## Security Vulnerabilities
+### 4. Configuration de l'environnement
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+```bash
+cp .env.example .env
+php artisan key:generate
+```
 
-## License
+### 5. Configurer la base de données
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+Éditez le fichier `.env` et configurez vos paramètres de base de données :
+
+```env
+DB_CONNECTION=mysql
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE=minigpt
+DB_USERNAME=votre_utilisateur
+DB_PASSWORD=votre_mot_de_passe
+```
+
+### 6. Configurer l'API OpenAI
+
+Ajoutez votre clé API OpenAI dans le fichier `.env` :
+
+```env
+OPENAI_API_KEY=votre_cle_api_openai
+OPENAI_ORGANIZATION=votre_organisation_openai (optionnel)
+```
+
+### 7. Migrer la base de données
+
+```bash
+php artisan migrate
+```
+
+### 8. (Optionnel) Peupler la base de données
+
+```bash
+php artisan db:seed
+```
+
+## 🏃‍♂️ Lancement de l'application
+
+### Mode développement
+
+1. **Démarrer le serveur Laravel** :
+```bash
+php artisan serve
+```
+
+2. **Compiler les assets (dans un terminal séparé)** :
+```bash
+npm run dev
+```
+
+L'application sera accessible à l'adresse : `http://localhost:8000`
+
+### Mode production
+
+1. **Compiler les assets pour la production** :
+```bash
+npm run build
+```
+
+2. **Optimiser l'application** :
+```bash
+php artisan config:cache
+php artisan route:cache
+php artisan view:cache
+```
+
+## ⚙️ Configuration avancée
+
+### Nettoyage automatique des sessions
+
+Pour activer le nettoyage automatique des sessions expirées, ajoutez cette tâche cron :
+
+```bash
+* * * * * cd /chemin/vers/votre/projet && php artisan schedule:run >> /dev/null 2>&1
+```
+
+### Configuration du cache
+
+Pour améliorer les performances, configurez Redis comme driver de cache :
+
+```env
+CACHE_DRIVER=redis
+SESSION_DRIVER=redis
+QUEUE_CONNECTION=redis
+```
+
+## 📖 Utilisation
+
+1. **Créer un compte** : Inscrivez-vous via l'interface d'authentification
+2. **Configurer vos instructions** : Accédez aux paramètres pour personnaliser le comportement de l'IA
+3. **Démarrer une conversation** : Cliquez sur "Nouvelle conversation" et commencez à chater
+4. **Gérer vos conversations** : Consultez, recherchez et organisez vos discussions depuis le panneau latéral
+
+## 🧪 Tests
+
+Exécuter les tests :
+
+```bash
+php artisan test
+```
+
+Ou avec PHPUnit :
+
+```bash
+./vendor/bin/phpunit
+```
+
+## 📝 Commandes utiles
+
+```bash
+# Nettoyer les sessions expirées
+php artisan sessions:clean
+
+# Vider le cache
+php artisan cache:clear
+
+# Reconstruire les assets
+npm run build
+
+# Vérifier le statut de l'application
+php artisan about
+```
+
+## 🤝 Contribution
+
+Les contributions sont les bienvenues ! Pour contribuer :
+
+1. Forkez le projet
+2. Créez une branche pour votre fonctionnalité (`git checkout -b feature/AmazingFeature`)
+3. Committez vos changements (`git commit -m 'Add some AmazingFeature'`)
+4. Poussez vers la branche (`git push origin feature/AmazingFeature`)
+5. Ouvrez une Pull Request
+
+## 📄 License
+
+Ce projet est sous licence MIT. Voir le fichier `LICENSE` pour plus de détails.
+
+## 📞 Support
+
+Pour toute question ou problème, n'hésitez pas à :
+
+- Ouvrir une issue sur GitHub
+- Contacter l'équipe de développement
+
+---
+
+**MiniGPT** - Votre assistant IA personnel, simple et puissant.
