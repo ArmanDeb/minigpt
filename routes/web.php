@@ -19,6 +19,13 @@ Route::get('/', function () {
     ]);
 })->name('home');
 
+// Route pour obtenir le token CSRF frais (accessible à tous)
+Route::get('/fresh-csrf-token', function () {
+    return response()->json([
+        'csrf_token' => csrf_token()
+    ]);
+})->name('fresh-csrf-token');
+
 Route::middleware([
     'auth:sanctum',
     config('jetstream.auth_session'),
@@ -32,29 +39,22 @@ Route::middleware([
     // Custom Instructions routes
     Route::get('/custom-instructions', [CustomInstructionsController::class, 'index'])->name('custom-instructions.index');
     Route::put('/custom-instructions', [CustomInstructionsController::class, 'update'])->name('custom-instructions.update');
+
+    // Ask AI routes
+    Route::get('/ask', [AskController::class, 'index'])->name('ask.index');
+    Route::post('/ask', [AskController::class, 'ask'])->name('ask');
+
+    // Conversation management routes (now handled by AskController)
+    Route::get('/conversations', [AskController::class, 'conversationsList'])->name('conversations.index');
+    Route::get('/conversations/create', [AskController::class, 'createConversation'])->name('conversations.create');
+    Route::post('/conversations', [AskController::class, 'storeConversation'])->name('conversations.store');
+    Route::post('/conversations/empty', [AskController::class, 'createEmptyConversation'])->name('conversations.store.empty');
+    Route::get('/conversations/{conversation}', [AskController::class, 'showConversation'])->name('conversations.show');
+    Route::post('/conversations/{conversation}/messages', [AskController::class, 'sendMessage'])->name('conversations.messages.store');
+    Route::match(['get', 'post'], '/conversations/{conversation}/stream', [AskController::class, 'sendMessageStream'])->name('chat.stream');
+    Route::post('/conversations/{conversation}/update-model', [AskController::class, 'updateConversationModel'])->name('conversations.update-model');
+    Route::post('/conversations/{conversation}/update-title', [AskController::class, 'updateConversationTitle'])->name('conversations.update-title');
+    Route::post('/conversations/{conversation}/toggle-favorite', [AskController::class, 'toggleFavorite'])->name('conversations.toggle-favorite');
+    Route::delete('/conversations/{conversation}', [AskController::class, 'destroyConversation'])->name('conversations.destroy');
+    Route::delete('/conversations', [AskController::class, 'destroyMultipleConversations'])->name('conversations.destroy-multiple');
 });
-
-// CSRF token refresh route
-Route::get('/csrf-token', function () {
-    return response()->json([
-        'csrf_token' => csrf_token()
-    ]);
-});
-
-// Ask AI routes
-Route::get('/ask', [AskController::class, 'index'])->name('ask.index');
-Route::post('/ask', [AskController::class, 'ask'])->name('ask');
-
-// Conversation management routes (now handled by AskController)
-Route::get('/conversations', [AskController::class, 'conversationsList'])->name('conversations.index');
-Route::get('/conversations/create', [AskController::class, 'createConversation'])->name('conversations.create');
-Route::post('/conversations', [AskController::class, 'storeConversation'])->name('conversations.store');
-Route::post('/conversations/empty', [AskController::class, 'createEmptyConversation'])->name('conversations.store.empty');
-Route::get('/conversations/{conversation}', [AskController::class, 'showConversation'])->name('conversations.show');
-Route::post('/conversations/{conversation}/messages', [AskController::class, 'sendMessage'])->name('conversations.messages.store');
-Route::match(['get', 'post'], '/conversations/{conversation}/stream', [AskController::class, 'sendMessageStream'])->name('chat.stream');
-Route::post('/conversations/{conversation}/update-model', [AskController::class, 'updateConversationModel'])->name('conversations.update-model');
-Route::post('/conversations/{conversation}/update-title', [AskController::class, 'updateConversationTitle'])->name('conversations.update-title');
-Route::post('/conversations/{conversation}/toggle-favorite', [AskController::class, 'toggleFavorite'])->name('conversations.toggle-favorite');
-Route::delete('/conversations/{conversation}', [AskController::class, 'destroyConversation'])->name('conversations.destroy');
-Route::delete('/conversations', [AskController::class, 'destroyMultipleConversations'])->name('conversations.destroy-multiple');

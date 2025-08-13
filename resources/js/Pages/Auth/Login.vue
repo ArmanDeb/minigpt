@@ -21,9 +21,9 @@ const submit = () => {
         remember: form.remember ? 'on' : '',
     })).post(route('login'), {
         onFinish: () => form.reset('password'),
-        onSuccess: () => {
-            // Rechargement pour token CSRF frais après login
-            window.location.reload();
+        onSuccess: async () => {
+            // Rafraîchir le token CSRF après login
+            await window.refreshCsrfToken?.();
         },
     });
 };
