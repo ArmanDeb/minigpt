@@ -9,38 +9,8 @@ function getCsrfToken() {
     return token ? token.content : null;
 }
 
-// Fonction pour rafraîchir le token CSRF après login/logout
-async function refreshCsrfToken() {
-    try {
-        const response = await fetch('/fresh-csrf-token', {
-            method: 'GET',
-            credentials: 'same-origin'
-        });
-
-        if (response.ok) {
-            const data = await response.json();
-            const newToken = data.csrf_token;
-
-            // Mettre à jour le meta tag
-            const metaTag = document.head.querySelector('meta[name="csrf-token"]');
-            if (metaTag) {
-                metaTag.setAttribute('content', newToken);
-            }
-
-            // Mettre à jour axios
-            window.axios.defaults.headers.common['X-CSRF-TOKEN'] = newToken;
-            window.csrfToken = newToken;
-
-            return newToken;
-        }
-    } catch (error) {
-        console.error('Erreur lors du rafraîchissement du token CSRF:', error);
-    }
-    return null;
-}
-
-// Exposer la fonction globalement
-window.refreshCsrfToken = refreshCsrfToken;
+// Note: La fonction refreshCsrfToken a été supprimée car elle n'est plus nécessaire
+// Le middleware PersistentCsrfToken gère automatiquement la persistance du token CSRF
 
 // Configuration initiale du token CSRF
 const token = getCsrfToken();

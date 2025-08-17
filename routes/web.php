@@ -19,12 +19,8 @@ Route::get('/', function () {
     ]);
 })->name('home');
 
-// Route pour obtenir le token CSRF frais (accessible à tous)
-Route::get('/fresh-csrf-token', function () {
-    return response()->json([
-        'csrf_token' => csrf_token()
-    ]);
-})->name('fresh-csrf-token');
+// Note: La route /fresh-csrf-token a été supprimée car elle n'est plus nécessaire
+// Le middleware PersistentCsrfToken gère automatiquement la persistance du token CSRF
 
 Route::middleware([
     'auth:sanctum',

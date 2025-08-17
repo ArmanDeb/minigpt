@@ -369,36 +369,11 @@ const streamMessage = async (conversationId, userMessage) => {
                     })
                 });
 
-                // Handle 419 errors with retry
-                if (response.status === 419 && retryCount < 2) {
-                    console.log('CSRF token expired, refreshing and retrying...');
-
-                    // Try to refresh the CSRF token
-                    try {
-                        const tokenResponse = await fetch('/csrf-token', {
-                            method: 'GET',
-                            credentials: 'same-origin',
-                            headers: { 'Accept': 'application/json' }
-                        });
-
-                        if (tokenResponse.ok) {
-                            const tokenData = await tokenResponse.json();
-                            const newToken = tokenData.csrf_token;
-
-                            // Update the meta tag
-                            const metaTag = document.querySelector('meta[name="csrf-token"]');
-                            if (metaTag && newToken) {
-                                metaTag.setAttribute('content', newToken);
-
-                                // Retry the request
-                                return makeRequest(retryCount + 1);
-                            }
-                        }
-                    } catch (tokenError) {
-                        console.error('Failed to refresh CSRF token:', tokenError);
-                    }
-
-                    throw new Error('CSRF token expired and could not be refreshed');
+                // Handle 419 errors - redirect to login (token is persistent now)
+                if (response.status === 419) {
+                    console.log('Session expired, redirecting to login...');
+                    window.location.href = '/login';
+                    return;
                 }
 
                 if (!response.ok) {
