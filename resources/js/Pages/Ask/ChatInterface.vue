@@ -369,7 +369,7 @@ const streamMessage = async (conversationId, userMessage) => {
                     })
                 });
 
-                // Handle 419 errors - redirect to login (token is persistent now)
+                // Handle 419 errors (CSRF token expired/session expired)
                 if (response.status === 419) {
                     console.log('Session expired, redirecting to login...');
                     window.location.href = '/login';

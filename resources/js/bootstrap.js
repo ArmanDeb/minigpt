@@ -9,8 +9,7 @@ function getCsrfToken() {
     return token ? token.content : null;
 }
 
-// Note: La fonction refreshCsrfToken a été supprimée car elle n'est plus nécessaire
-// Le middleware PersistentCsrfToken gère automatiquement la persistance du token CSRF
+// Le token CSRF est maintenant géré automatiquement par le middleware PersistentCsrfToken
 
 // Configuration initiale du token CSRF
 const token = getCsrfToken();

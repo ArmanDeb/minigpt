@@ -19,9 +19,6 @@ Route::get('/', function () {
     ]);
 })->name('home');
 
-// Note: La route /fresh-csrf-token a été supprimée car elle n'est plus nécessaire
-// Le middleware PersistentCsrfToken gère automatiquement la persistance du token CSRF
-
 Route::middleware([
     'auth:sanctum',
     config('jetstream.auth_session'),

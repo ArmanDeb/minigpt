@@ -43,7 +43,12 @@ const toggleFavorite = (conversation, event) => {
 };
 
 const logout = () => {
-    router.post(route('logout'));
+    router.post(route('logout'), {}, {
+        onSuccess: async () => {
+            // Rafraîchir le token CSRF après logout
+            await window.refreshCsrfToken?.();
+        }
+    });
 };
 </script>
 
