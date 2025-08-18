@@ -10,6 +10,7 @@ import MessageList from '@/Components/MessageList.vue';
 import MessageForm from '@/Components/MessageForm.vue';
 import ModelSelector from '@/Components/ModelSelector.vue';
 import axios from 'axios';
+import { makeStreamingFetch } from '@/utils/streaming.js';
 
 const props = defineProps({
     models: {
@@ -259,28 +260,26 @@ const changeModel = (modelId) => {
 // Configuration du Stream avec useStream
 let streamInstance = null;
 
-// Fonction pour créer un EventSource personnalisé avec CSRF token
-const createEventSourceWithCSRF = (url) => {
-    // Pour EventSource, on ne peut pas ajouter de headers directement
-    // On ajoute donc le token dans l'URL
-    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
-    const separator = url.includes('?') ? '&' : '?';
-    const urlWithToken = `${url}${separator}csrf_token=${csrfToken}`;
-
-    return new EventSource(urlWithToken);
-};
+// Note: EventSource ne supporte pas les cookies XSRF nativement
+// Utiliser plutôt makeStreamingFetch pour le streaming avec protection CSRF
 
 const setupStream = () => {
     if (!getStreamUrl.value) return;
 
     // Recréer le stream avec la nouvelle URL
-    streamInstance = useStream(
-        getStreamUrl.value, // Utiliser directement la valeur de l'URL
-        {
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content')
-            },
+                    // Récupérer le token XSRF depuis les cookies
+        const xsrfToken = document.cookie
+            .split('; ')
+            .find(row => row.startsWith('XSRF-TOKEN='))
+            ?.split('=')[1];
+
+        streamInstance = useStream(
+            getStreamUrl.value, // Utiliser directement la valeur de l'URL
+            {
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-XSRF-TOKEN': xsrfToken ? decodeURIComponent(xsrfToken) : ''
+                },
             onData: (data) => {
                 // Concaténer chaque chunk au dernier message
                 const lastMessage = messages.value[messages.value.length - 1];
@@ -348,43 +347,18 @@ const streamMessage = async (conversationId, userMessage) => {
     scrollToBottom();
 
             try {
-            const makeRequest = async (retryCount = 0) => {
-                // Get fresh CSRF token
-                const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
-
-                if (!csrfToken) {
-                    throw new Error('CSRF token not found');
-                }
-
-                const response = await fetch(`/conversations/${conversationId}/stream`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRF-TOKEN': csrfToken,
-                        'Accept': 'text/event-stream'
-                    },
-                    body: JSON.stringify({
-                        message: userMessage,
-                        model: form.model
-                    })
-                });
-
-                // Handle 419 errors (CSRF token expired/session expired)
-                if (response.status === 419) {
-                    console.log('Session expired, redirecting to login...');
-                    window.location.href = '/login';
-                    return;
-                }
-
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-
-                return response;
-            };
-
-            // Utiliser fetch directement pour plus de contrôle
-            const response = await makeRequest();
+            // Utiliser la nouvelle fonction de streaming avec XSRF automatique
+            const response = await makeStreamingFetch(`/conversations/${conversationId}/stream`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'text/event-stream'
+                },
+                body: JSON.stringify({
+                    message: userMessage,
+                    model: form.model
+                })
+            });
 
         // Traiter la réponse en streaming
         const reader = response.body.getReader();

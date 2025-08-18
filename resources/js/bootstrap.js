@@ -3,24 +3,11 @@ window.axios = axios;
 
 window.axios.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest';
 
-// Fonction pour obtenir le token CSRF depuis le meta tag
-function getCsrfToken() {
-    const token = document.head.querySelector('meta[name="csrf-token"]');
-    return token ? token.content : null;
-}
+// Configuration Axios pour utiliser les cookies XSRF automatiquement
+window.axios.defaults.xsrfCookieName = 'XSRF-TOKEN';
+window.axios.defaults.xsrfHeaderName = 'X-XSRF-TOKEN';
 
-// Le token CSRF est maintenant géré automatiquement par le middleware PersistentCsrfToken
-
-// Configuration initiale du token CSRF
-const token = getCsrfToken();
-if (token) {
-    window.axios.defaults.headers.common['X-CSRF-TOKEN'] = token;
-    window.csrfToken = token;
-} else {
-    console.error('CSRF token not found: https://laravel.com/docs/csrf#csrf-x-csrf-token');
-}
-
-// Intercepteur axios simplifié - plus besoin de gérer le refresh du token
+// Intercepteur pour gérer les erreurs de session expirée
 window.axios.interceptors.response.use(
     response => response,
     error => {
@@ -32,18 +19,3 @@ window.axios.interceptors.response.use(
         return Promise.reject(error);
     }
 );
-
-// Wrapper fetch global avec token CSRF
-const originalFetch = window.fetch;
-window.fetch = function(url, options = {}) {
-    const currentToken = getCsrfToken();
-
-    if (currentToken) {
-        options.headers = options.headers || {};
-        if (!options.headers['X-CSRF-TOKEN']) {
-            options.headers['X-CSRF-TOKEN'] = currentToken;
-        }
-    }
-
-    return originalFetch(url, options);
-};
